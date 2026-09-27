@@ -70,8 +70,6 @@ VIP Seedance 2 的公开合同要求参考素材是无需登录即可读取的�
 
 为保持用户无感，Provider 会自动把本地或私有资源上传到 [Catbox Litterbox](https://catbox.moe/tools.php)，然后只把经过预检的 `https://litter.catbox.moe/...` 直链写入 VIP 请求。用户不需要注册 Catbox、配置 API Key、配置 R2 或手动复制 URL；已经合格的公网 HTTPS 资源会直接复用。Litterbox 上传固定使用公开约定的最长保留时间 **72 小时**，不会创建永久 Catbox 文件。
 
-这意味着上传期间素材会暂时放在公网直链上，任何持有直链的人都可能读取；链接会按 Litterbox 生命周期自动过期。使用该功能前请阅读 [Catbox Tools](https://catbox.moe/tools.php) 和 [Catbox FAQ/条款说明](https://catbox.moe/faq.php)，并确认你的素材适合临时公开。第三方服务条款不由本项目许可证覆盖。
-
 Hypit 的通用 Seedance Model 还暴露 `generateAudio`、`webSearch` 和 `personReference` 等 Provider 可能需要的字段；VIP Seedance 2 页面没有声明这些字段。因此 Provider 对这些未证明可转换的输入保持拒绝，不会静默丢字段。完整参考素材能力需要一个与 VIP 合同严格对应的 Model/Surface 扩展。
 
 ## 测试
