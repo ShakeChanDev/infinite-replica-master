@@ -5,6 +5,7 @@
   "type": "module",
   "description": "无限复刻大师：基于 Hypit 的 VIP 视频 Provider 项目",
   "scripts": {
+    "pretest": "npm run build",
     "test": "node --test --experimental-strip-types",
     "build": "npm --prefix packages/provider-vip-brioi run build"
   },

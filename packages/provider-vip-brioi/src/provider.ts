@@ -1,8 +1,11 @@
 import { canonicalize, defineEndpointPackage, wakeAfter } from "@hypit/hypit/endpoint-kit";
 import type { AsyncEndpoint, CredentialRef, EndpointRequest } from "@hypit/hypit/endpoint-kit";
 import { generationTypes, sealGeneratedVideoSet } from "@hypit/hypit/generation";
-import type { GenerationMediaValue, GenerationRequest } from "@hypit/hypit/generation";
-import { buildVipVideoRequest, extractVipResultUrl, mapVipTaskStatus } from "./vip-request.js";
+import type { GenerationRequest } from "@hypit/hypit/generation";
+import { compileVipVideoRequest } from "./vip-reference-bridge.js";
+import { extractVipResultUrl, mapVipTaskStatus } from "./vip-request.js";
+
+export { compileVipVideoRequest } from "./vip-reference-bridge.js";
 
 export const providerModule = { name: "@infinite-replica/provider-vip-brioi", version: "1" } as const;
 
@@ -24,10 +27,6 @@ function text(value: unknown, subject: string): string {
 
 function secretOf(credentials: Readonly<Record<string, { secret: string }>>): string {
   return text(credentials.apiKey?.secret, "VIP API key");
-}
-
-function mediaItems(ports: GenerationRequest["ports"], name: string): readonly GenerationMediaValue[] {
-  return (ports[name] ?? []) as readonly GenerationMediaValue[];
 }
 
 function support(request: EndpointRequest) {
@@ -54,7 +53,6 @@ export function createVipVideoProvider(options: {
   const origin = base.href.replace(/\/$/u, "");
   const fetcher = options.fetch ?? globalThis.fetch;
   const pollIntervalMs = options.pollIntervalMs ?? 5_000;
-
   async function json(path: string, secret: string, init: RequestInit = {}): Promise<Record<string, unknown>> {
     const response = await fetcher(`${origin}${path}`, {
       ...init,
@@ -66,43 +64,16 @@ export function createVipVideoProvider(options: {
     return object(body);
   }
 
-  async function compileRequest(model: string, request: GenerationRequest, resources: { get(id: string): Promise<Uint8Array | undefined> }) {
-    const ports = request.ports;
-    const refs: Array<{ url: string; type: "image" | "video" | "audio"; role?: "reference_image" | "reference_video" | "reference_audio" | "first_frame" | "last_frame" }> = [];
-    async function resolve(items: readonly GenerationMediaValue[], type: "image" | "video" | "audio", role?: "first_frame" | "last_frame") {
-      for (const item of items) {
-        const artifact = item.artifact as { resource?: string };
-        const resource = artifact.resource;
-        if (typeof resource !== "string") throw new Error("VIP Provider requires a public URL resource bridge for references");
-        const bytes = await resources.get(resource);
-        if (bytes === undefined) throw new Error(`Reference resource ${resource} is unavailable`);
-        throw new Error("VIP Provider cannot turn a local resource into a public HTTPS URL without a configured storage bridge");
-      }
-    }
-    await resolve(mediaItems(ports, "referenceImage"), "image");
-    await resolve(mediaItems(ports, "referenceVideo"), "video");
-    await resolve(mediaItems(ports, "referenceAudio"), "audio");
-    await resolve(mediaItems(ports, "firstFrame"), "image", "first_frame");
-    await resolve(mediaItems(ports, "lastFrame"), "image", "last_frame");
-    const prompt = text(ports.prompt?.[0], "VIP prompt");
-    const duration = Number(ports.duration?.[0]);
-    return buildVipVideoRequest({
-      model: text(model, "Seedance model"),
-      prompt,
-      duration,
-      resolution: String(ports.resolution?.[0] ?? "720p"),
-      aspectRatio: String(ports.aspectRatio?.[0] ?? "9:16"),
-      refs,
-      generateAudio: ports.generateAudio?.[0] === true,
-      webSearch: ports.webSearch?.[0] === true,
-    });
-  }
-
   const endpoint: AsyncEndpoint = {
     async start(context) {
       const supported = support(context.need);
       if (supported.status === "unsupported") throw new Error(supported.reason);
-      const request = await compileRequest(context.need.capability.name, context.need.constraints as unknown as GenerationRequest, context.resources);
+      const request = await compileVipVideoRequest(
+        context.need.capability.name,
+        context.need.constraints as unknown as GenerationRequest,
+        context.resources,
+        { fetch: fetcher },
+      );
       const task = await json("/v1/videos", secretOf(context.credentials), {
         method: "POST",
         headers: { "content-type": "application/json" },
