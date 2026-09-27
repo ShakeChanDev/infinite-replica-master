@@ -1,0 +1,22 @@
+{
+  "format": "hypit.runtime-local@1",
+  "dataRoot": ".hypit/execution",
+  "credentials": {
+    "platform": { "use": "@hypit/credential-store-platform" }
+  },
+  "endpoints": {
+    "vip-brioi.video": {
+      "use": "@infinite-replica/provider-vip-brioi",
+      "config": {
+        "baseUrl": "https://vip.brioi.com",
+        "apiKey": { "store": "platform", "key": "vip-brioi.personal" },
+        "pollIntervalMs": 5000,
+        "concurrency": 1
+      }
+    }
+  },
+  "bindings": {
+    "@hypit/seedance@1#seedance-2-mini": "vip-brioi.video"
+  }
+}
+

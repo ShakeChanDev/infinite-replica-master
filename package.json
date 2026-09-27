@@ -1,0 +1,14 @@
+{
+  "name": "infinite-replica-master",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "无限复刻大师：基于 Hypit 的 VIP 视频 Provider 项目",
+  "scripts": {
+    "test": "node --test --experimental-strip-types",
+    "build": "npm --prefix packages/provider-vip-brioi run build"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

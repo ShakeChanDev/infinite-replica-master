@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+.hypit/
+.env
+.env.*
+!.env.example
+.private/
+*.log
+
