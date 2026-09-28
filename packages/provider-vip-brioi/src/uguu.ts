@@ -1,16 +1,15 @@
-export const LITTERBOX_ENDPOINT = "https://litterbox.catbox.moe/resources/internals/api.php";
-export const LITTERBOX_RETENTION = "72h" as const;
-export const LITTERBOX_HOST = "litter.catbox.moe";
+export const UGUU_ENDPOINT = "https://uguu.se/upload.php";
+export const UGUU_HOST_SUFFIX = ".uguu.se";
+export const UGUU_MAX_BYTES = 128 * 1024 * 1024;
 
-export type LitterboxUploadInput = {
+export type UguuUploadInput = {
   readonly bytes: Uint8Array;
   readonly mediaType: string;
   readonly filename?: string;
 };
 
-export type LitterboxUploadResult = {
+export type UguuUploadResult = {
   readonly url: string;
-  readonly retention: typeof LITTERBOX_RETENTION;
 };
 
 type Fetcher = typeof globalThis.fetch;
@@ -29,27 +28,27 @@ function mediaTypeOf(value: string | null): string | undefined {
 function validateMediaType(mediaType: string): string {
   const normalized = mediaTypeOf(mediaType);
   if (normalized === undefined || !/^(?:image|video|audio)\/[a-z0-9.+-]+$/u.test(normalized)) {
-    throw new Error(`Litterbox upload requires an image, video, or audio MIME type`);
+    throw new Error("Uguu upload requires an image, video, or audio MIME type");
   }
   return normalized;
 }
 
-function validateLitterboxUrl(value: string): string {
+function validateUguuUrl(value: string): string {
   let parsed: URL;
   try {
     parsed = new URL(value);
   } catch {
-    throw new Error("Litterbox returned an invalid URL");
+    throw new Error("Uguu returned an invalid URL");
   }
   if (
     parsed.protocol !== "https:"
-    || parsed.hostname !== LITTERBOX_HOST
+    || (parsed.hostname !== "uguu.se" && !parsed.hostname.endsWith(UGUU_HOST_SUFFIX))
     || parsed.port !== ""
     || parsed.username !== ""
     || parsed.password !== ""
     || parsed.pathname === "/"
   ) {
-    throw new Error("Litterbox returned a non-public media URL");
+    throw new Error("Uguu returned a non-public media URL");
   }
   return parsed.href;
 }
@@ -64,10 +63,7 @@ function responseIsReadable(response: Response): boolean {
   return response.ok || response.status === 206;
 }
 
-/**
- * Verify that a URL can be fetched as the expected media type without credentials.
- * HEAD is preferred; a one-byte Range GET handles origins that reject HEAD.
- */
+/** Verify that a URL can be fetched as the expected media type without credentials. */
 export async function verifyDirectMediaUrl(
   url: string,
   expectedMediaType: string,
@@ -95,50 +91,82 @@ export async function verifyDirectMediaUrl(
   if (!responseIsReadable(response)) {
     throw new Error(`Public reference preflight returned HTTP ${response.status}`);
   }
+  if (response.headers.get("content-length") === "0") {
+    throw new Error("Public reference returned an empty response");
+  }
   const actual = mediaTypeOf(response.headers.get("content-type"));
   if (actual !== expected) {
     throw new Error(`Public reference MIME type ${actual ?? "missing"} does not match ${expected}`);
   }
 }
 
-async function uploadOnce(
-  input: LitterboxUploadInput,
-  fetcher: Fetcher,
-): Promise<LitterboxUploadResult> {
+type UguuApiResponse = {
+  success?: unknown;
+  files?: unknown;
+};
+
+function uploadUrlFromResponse(value: unknown): string {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Uguu upload returned an invalid JSON response");
+  }
+  const body = value as UguuApiResponse;
+  if (body.success !== true || !Array.isArray(body.files) || body.files.length === 0) {
+    throw new Error("Uguu upload did not return a file URL");
+  }
+  const first = body.files[0];
+  if (first === null || typeof first !== "object" || Array.isArray(first)) {
+    throw new Error("Uguu upload did not return a file URL");
+  }
+  const url = (first as { url?: unknown }).url;
+  if (typeof url !== "string" || url.length === 0) {
+    throw new Error("Uguu upload did not return a file URL");
+  }
+  return validateUguuUrl(url);
+}
+
+async function uploadOnce(input: UguuUploadInput, fetcher: Fetcher): Promise<UguuUploadResult> {
   const mediaType = validateMediaType(input.mediaType);
+  if (input.bytes.byteLength > UGUU_MAX_BYTES) {
+    throw new Error("Uguu upload exceeds the 128 MiB file limit");
+  }
+
   const form = new FormData();
-  form.append("reqtype", "fileupload");
-  form.append("time", LITTERBOX_RETENTION);
   form.append(
-    "fileToUpload",
+    "files[]",
     new Blob([ownedArrayBuffer(input.bytes)], { type: mediaType }),
     input.filename ?? filenameFor(mediaType),
   );
 
-  const response = await fetcher(LITTERBOX_ENDPOINT, {
+  const response = await fetcher(UGUU_ENDPOINT, {
     method: "POST",
     body: form,
     signal: AbortSignal.timeout(120_000),
   });
-  const body = (await response.text()).trim();
-  if (!response.ok) throw new Error(`Litterbox upload returned HTTP ${response.status}`);
-  const url = validateLitterboxUrl(body);
+  if (!response.ok) throw new Error(`Uguu upload returned HTTP ${response.status}`);
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error("Uguu upload returned invalid JSON");
+  }
+  const url = uploadUrlFromResponse(body);
   await verifyDirectMediaUrl(url, mediaType, fetcher);
-  return { url, retention: LITTERBOX_RETENTION };
+  return { url };
 }
 
-export function createLitterboxUploader(options: {
+export function createUguuUploader(options: {
   fetch?: Fetcher;
   maxAttempts?: number;
 } = {}) {
   const fetcher = options.fetch ?? globalThis.fetch;
   const maxAttempts = options.maxAttempts ?? 2;
   if (!Number.isSafeInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 3) {
-    throw new Error("Litterbox maxAttempts must be an integer from 1 to 3");
+    throw new Error("Uguu maxAttempts must be an integer from 1 to 3");
   }
 
   return {
-    async upload(input: LitterboxUploadInput): Promise<LitterboxUploadResult> {
+    async upload(input: UguuUploadInput): Promise<UguuUploadResult> {
       let lastError: unknown;
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         try {
@@ -148,12 +176,11 @@ export function createLitterboxUploader(options: {
           if (attempt < maxAttempts) await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
         }
       }
-      throw lastError instanceof Error ? lastError : new Error("Litterbox upload failed");
+      throw lastError instanceof Error ? lastError : new Error("Uguu upload failed");
     },
   };
 }
 
-/** Upload with the default global fetcher; Providers use the factory above to inject their fetcher. */
-export async function upload(input: LitterboxUploadInput): Promise<LitterboxUploadResult> {
-  return createLitterboxUploader().upload(input);
+export async function upload(input: UguuUploadInput): Promise<UguuUploadResult> {
+  return createUguuUploader().upload(input);
 }

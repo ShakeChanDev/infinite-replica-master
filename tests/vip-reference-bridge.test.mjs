@@ -26,7 +26,7 @@ test("uploads local references once per content and keeps reference order and ro
   const uploader = {
     async upload(input) {
       uploads.push(input);
-      return { url: `https://litter.catbox.moe/upload-${uploads.length}`, retention: "72h" };
+      return { url: `https://d.uguu.se/upload-${uploads.length}` };
     },
   };
   const compiled = await compileVipVideoRequest("seedance-2", request({
@@ -37,10 +37,10 @@ test("uploads local references once per content and keeps reference order and ro
 
   assert.equal(uploads.length, 3);
   assert.deepEqual(compiled.ref.map(({ url, type, role }) => ({ url, type, role })), [
-    { url: "https://litter.catbox.moe/upload-1", type: "image", role: "reference_image" },
-    { url: "https://litter.catbox.moe/upload-1", type: "image", role: "reference_image" },
-    { url: "https://litter.catbox.moe/upload-2", type: "video", role: "reference_video" },
-    { url: "https://litter.catbox.moe/upload-3", type: "audio", role: "reference_audio" },
+    { url: "https://d.uguu.se/upload-1", type: "image", role: "reference_image" },
+    { url: "https://d.uguu.se/upload-1", type: "image", role: "reference_image" },
+    { url: "https://d.uguu.se/upload-2", type: "video", role: "reference_video" },
+    { url: "https://d.uguu.se/upload-3", type: "audio", role: "reference_audio" },
   ]);
   assert.ok(compiled.ref.every(({ url }) => url.startsWith("https://")));
 });
@@ -61,7 +61,7 @@ test("reuses a valid public HTTPS reference without reading or uploading it", as
     },
   }, {
     fetch: fetcher,
-    uploader: { async upload() { uploads += 1; return { url: "https://litter.catbox.moe/unused", retention: "72h" }; } },
+    uploader: { async upload() { uploads += 1; return { url: "https://d.uguu.se/unused" }; } },
   });
 
   assert.equal(reads, 0);
@@ -77,12 +77,12 @@ test("keeps strict first-frame and last-frame roles after upload", async () => {
   }), {
     async get(id) { return new Uint8Array(id === "first" ? [1] : [2]); },
   }, {
-    uploader: { async upload() { const url = `https://litter.catbox.moe/frame-${uploaded.length}`; uploaded.push(url); return { url, retention: "72h" }; } },
+    uploader: { async upload() { const url = `https://d.uguu.se/frame-${uploaded.length}`; uploaded.push(url); return { url }; } },
   });
 
   assert.deepEqual(compiled.ref.map(({ url, role }) => ({ url, role })), [
-    { url: "https://litter.catbox.moe/frame-0", role: "first_frame" },
-    { url: "https://litter.catbox.moe/frame-1", role: "last_frame" },
+    { url: "https://d.uguu.se/frame-0", role: "first_frame" },
+    { url: "https://d.uguu.se/frame-1", role: "last_frame" },
   ]);
 });
 
@@ -92,9 +92,9 @@ test("stops before any VIP submission when a local upload fails", async () => {
     compileVipVideoRequest("seedance-2", request({ referenceImage: [media("broken", "image/png")] }), {
       async get() { return new Uint8Array([1, 2]); },
     }, {
-      uploader: { async upload() { throw new Error("Litterbox unavailable"); } },
+      uploader: { async upload() { throw new Error("Uguu unavailable"); } },
     }),
-    /Litterbox unavailable/,
+    /Uguu unavailable/,
   );
   assert.equal(vipPosts, 0);
 });

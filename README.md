@@ -13,7 +13,7 @@ Hypit Model → VIP Provider → https://vip.brioi.com/v1/videos
 - VIP `GET /v1/videos/{id}` 状态轮询；
 - 完成后下载 `metadata.url` 并交回 Hypit 资源仓库；
 - 模型名、分辨率、宽高比和任务状态转换；
-- 本地或私有参考素材自动上传到 Catbox Litterbox，固定临时保留 72 小时；
+- 本地或私有参考素材自动上传到 Uguu；
 - 本地 mock dry-run 与负向边界测试。
 
 当前不包含：
@@ -68,7 +68,7 @@ Provider 依赖 `@hypit/hypit` 的公开 `endpoint-kit`、`generation` 和 `runt
 
 VIP Seedance 2 的公开合同要求参考素材是无需登录即可读取的公网 HTTPS 直链。项目不会把本地文件路径、Cookie 或 API Key 塞进 `ref`。
 
-为保持用户无感，Provider 会自动把本地或私有资源上传到 [Catbox Litterbox](https://catbox.moe/tools.php)，然后只把经过预检的 `https://litter.catbox.moe/...` 直链写入 VIP 请求。用户不需要注册 Catbox、配置 API Key、配置 R2 或手动复制 URL；已经合格的公网 HTTPS 资源会直接复用。Litterbox 上传固定使用公开约定的最长保留时间 **72 小时**，不会创建永久 Catbox 文件。
+为保持用户无感，Provider 会自动把本地或私有资源上传到 [Uguu](https://uguu.se/)，然后只把经过预检的 `https://*.uguu.se/...` 直链写入 VIP 请求。用户不需要配置 Uguu、API Key、R2 或手动复制 URL；已经合格的公网 HTTPS 资源会直接复用。Uguu 当前公开上限为 **128 MiB**。
 
 Hypit 的通用 Seedance Model 还暴露 `generateAudio`、`webSearch` 和 `personReference` 等 Provider 可能需要的字段；VIP Seedance 2 页面没有声明这些字段。因此 Provider 对这些未证明可转换的输入保持拒绝，不会静默丢字段。完整参考素材能力需要一个与 VIP 合同严格对应的 Model/Surface 扩展。
 

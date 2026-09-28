@@ -1,8 +1,8 @@
 import type { GenerationMediaValue, GenerationRequest } from "@hypit/hypit/generation";
-import { createLitterboxUploader, verifyDirectMediaUrl } from "./catbox-litterbox.js";
+import { createUguuUploader, verifyDirectMediaUrl } from "./uguu.js";
 import { buildVipVideoRequest } from "./vip-request.js";
 
-type PublicAssetUploader = ReturnType<typeof createLitterboxUploader>;
+type PublicAssetUploader = ReturnType<typeof createUguuUploader>;
 type ResourceStore = { get(id: string): Promise<Uint8Array | undefined> };
 type VipReference = {
   url: string;
@@ -50,7 +50,7 @@ export async function compileVipVideoRequest(
 ) {
   const ports = request.ports;
   const fetcher = options.fetch ?? globalThis.fetch;
-  const uploader = options.uploader ?? createLitterboxUploader({ fetch: fetcher });
+  const uploader = options.uploader ?? createUguuUploader({ fetch: fetcher });
   const refs: VipReference[] = [];
   const publicByResource = new Map<string, string>();
   const publicByContent = new Map<string, string>();
@@ -104,4 +104,3 @@ export async function compileVipVideoRequest(
     webSearch: ports.webSearch?.[0] === true,
   });
 }
-
