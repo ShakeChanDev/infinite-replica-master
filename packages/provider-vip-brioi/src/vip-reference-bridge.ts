@@ -1,6 +1,7 @@
 import type { GenerationMediaValue, GenerationRequest } from "@hypit/hypit/generation";
 import { createUguuUploader, verifyDirectMediaUrl } from "./uguu.js";
-import { buildVipVideoRequest } from "./vip-request.js";
+import { buildVipVideoRequest, validateVipVideoShape } from "./vip-request.js";
+import type { PersonReferencePolicy } from "./provider.js";
 
 type PublicAssetUploader = ReturnType<typeof createUguuUploader>;
 type ResourceStore = { get(id: string): Promise<Uint8Array | undefined> };
@@ -46,11 +47,43 @@ export async function compileVipVideoRequest(
   options: {
     fetch?: typeof globalThis.fetch;
     uploader?: PublicAssetUploader;
+    personReferencePolicy?: PersonReferencePolicy;
   } = {},
 ) {
   const ports = request.ports;
   const fetcher = options.fetch ?? globalThis.fetch;
   const uploader = options.uploader ?? createUguuUploader({ fetch: fetcher });
+  const personReferencePolicy = options.personReferencePolicy ?? "reject";
+  const inputs = [
+    { items: mediaItems(ports, "referenceImage"), type: "image" as const, role: "reference_image" as const },
+    { items: mediaItems(ports, "referenceVideo"), type: "video" as const, role: "reference_video" as const },
+    { items: mediaItems(ports, "referenceAudio"), type: "audio" as const, role: "reference_audio" as const },
+    { items: mediaItems(ports, "firstFrame"), type: "image" as const, role: "first_frame" as const },
+    { items: mediaItems(ports, "lastFrame"), type: "image" as const, role: "last_frame" as const },
+  ];
+  const prompt = text(ports.prompt?.[0], "VIP prompt");
+  const duration = Number(ports.duration?.[0]);
+  const scalar = {
+    model: text(model, "Seedance model"), duration,
+    resolution: String(ports.resolution?.[0] ?? "720p"),
+    aspectRatio: String(ports.aspectRatio?.[0] ?? "9:16"),
+    generateAudio: ports.generateAudio?.[0] === true,
+    webSearch: ports.webSearch?.[0] === true,
+  };
+  validateVipVideoShape({ ...scalar, refs: inputs.flatMap(({ items, type, role }) => items.map(() => ({ type, role }))) });
+  for (const { items, type } of inputs) {
+    for (const item of items) {
+      if (item.fields?.personReference !== undefined && personReferencePolicy === "reject") {
+        throw new Error("VIP Seedance 2 has no documented personReference mapping");
+      }
+      if (item.fields?.personReference !== undefined && typeof item.fields.personReference !== "boolean") {
+        throw new Error("Seedance personReference must be boolean");
+      }
+      if (!item.artifact.mediaType.toLowerCase().startsWith(`${type}/`)) {
+        throw new Error(`Reference media type ${item.artifact.mediaType} does not match ${type}`);
+      }
+    }
+  }
   const refs: VipReference[] = [];
   const publicByResource = new Map<string, string>();
   const publicByContent = new Map<string, string>();
@@ -86,21 +119,14 @@ export async function compileVipVideoRequest(
     }
   }
 
-  await resolve(mediaItems(ports, "referenceImage"), "image");
-  await resolve(mediaItems(ports, "referenceVideo"), "video");
-  await resolve(mediaItems(ports, "referenceAudio"), "audio");
-  await resolve(mediaItems(ports, "firstFrame"), "image", "first_frame");
-  await resolve(mediaItems(ports, "lastFrame"), "image", "last_frame");
-  const prompt = text(ports.prompt?.[0], "VIP prompt");
-  const duration = Number(ports.duration?.[0]);
+  await resolve(inputs[0]!.items, "image");
+  await resolve(inputs[1]!.items, "video");
+  await resolve(inputs[2]!.items, "audio");
+  await resolve(inputs[3]!.items, "image", "first_frame");
+  await resolve(inputs[4]!.items, "image", "last_frame");
   return buildVipVideoRequest({
-    model: text(model, "Seedance model"),
+    ...scalar,
     prompt,
-    duration,
-    resolution: String(ports.resolution?.[0] ?? "720p"),
-    aspectRatio: String(ports.aspectRatio?.[0] ?? "9:16"),
     refs,
-    generateAudio: ports.generateAudio?.[0] === true,
-    webSearch: ports.webSearch?.[0] === true,
   });
 }

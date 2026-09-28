@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/hypit-ai/hypit.git",
+  "skillPath": "skills/hypit",
+  "referenceCommit": "b00532e413d83845b631df25f2319017541db0ac",
+  "installCommand": "npm run install:hypit-pro",
+  "forkPath": ".agents/skills/hypit-pro",
+  "ownership": "hypitPro preserves the full upstream Hypit creative workflow and references while this repository supplies the VIP video routing policy and Provider. Keep upstream attribution and license when refreshing the fork."
+}

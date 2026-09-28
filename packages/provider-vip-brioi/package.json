@@ -10,10 +10,9 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@hypit/hypit": "^0.2.13"
+    "@hypit/hypit": "0.2.16"
   },
   "devDependencies": {
     "typescript": "^5.9.3"
   }
 }
-

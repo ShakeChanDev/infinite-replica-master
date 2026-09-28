@@ -7,7 +7,9 @@
   "scripts": {
     "pretest": "npm run build",
     "test": "node --test --experimental-strip-types",
-    "build": "npm --prefix packages/provider-vip-brioi run build"
+    "build": "npm --prefix packages/provider-vip-brioi run build",
+    "install:hypit-pro": "node scripts/install-hypit-pro.mjs",
+    "setup:hypit-vip": "node scripts/setup-hypit-vip.mjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

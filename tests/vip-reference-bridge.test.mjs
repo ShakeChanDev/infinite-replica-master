@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { compileVipVideoRequest } from "../packages/provider-vip-brioi/dist/vip-reference-bridge.js";
 
-function media(resource, mediaType, role = "image") {
-  return { role, artifact: { kind: "blob", resource, size: 4, mediaType } };
+function media(resource, mediaType, role = "image", fields) {
+  return { role, artifact: { kind: "blob", resource, size: 4, mediaType }, ...(fields === undefined ? {} : { fields }) };
 }
 
 function request(ports) {
@@ -97,4 +97,59 @@ test("stops before any VIP submission when a local upload fails", async () => {
     /Uguu unavailable/,
   );
   assert.equal(vipPosts, 0);
+});
+
+test("rejects personReference before uploading when the VIP mapping is strict", async () => {
+  let uploads = 0;
+  await assert.rejects(
+    compileVipVideoRequest("seedance-2", request({
+      referenceImage: [media("image", "image/png", "image", { personReference: true })],
+    }), {
+      async get() { return new Uint8Array([1]); },
+    }, {
+      uploader: { async upload() { uploads += 1; return { url: "https://d.uguu.se/unused" }; } },
+    }),
+    /personReference mapping/,
+  );
+  assert.equal(uploads, 0);
+});
+
+test("requires an explicit advisory policy before carrying personReference references to VIP", async () => {
+  const compiled = await compileVipVideoRequest("seedance-2", request({
+    referenceImage: [media("image", "image/png", "image", { personReference: false })],
+  }), {
+    async get() { return new Uint8Array([1]); },
+  }, {
+    personReferencePolicy: "advisory",
+    uploader: { async upload() { return { url: "https://d.uguu.se/advisory" }; } },
+  });
+
+  assert.deepEqual(compiled.ref, [{ url: "https://d.uguu.se/advisory", type: "image", role: "reference_image" }]);
+});
+
+test("rejects invalid Seedance 2.5 requests before reading or uploading media", async () => {
+  let reads = 0;
+  let uploads = 0;
+  const resources = { async get() { reads += 1; return new Uint8Array([1]); } };
+  const uploader = { async upload() { uploads += 1; return { url: "https://d.uguu.se/unused" }; } };
+  for (const ports of [
+    { duration: [-1], referenceImage: [media("image", "image/png")] },
+    { resolution: ["4k"], referenceImage: [media("image", "image/png")] },
+    { referenceAudio: Array.from({ length: 11 }, (_, n) => media(`audio-${n}`, "audio/mpeg")) },
+    { firstFrame: [media("first", "image/png")], referenceVideo: [media("video", "video/mp4")] },
+  ]) {
+    await assert.rejects(compileVipVideoRequest("seedance-2.5", request(ports), resources, { uploader }));
+  }
+  assert.equal(reads, 0);
+  assert.equal(uploads, 0);
+});
+
+test("Seedance 2.5 accepts pure audio and preserves its reference role", async () => {
+  const compiled = await compileVipVideoRequest("seedance-2.5", request({
+    referenceAudio: [media("audio", "audio/mpeg")],
+  }), { async get() { return new Uint8Array([1]); } }, {
+    uploader: { async upload() { return { url: "https://d.uguu.se/audio" }; } },
+  });
+  assert.equal(compiled.model, "seedance-2-5");
+  assert.deepEqual(compiled.ref, [{ url: "https://d.uguu.se/audio", type: "audio", role: "reference_audio" }]);
 });

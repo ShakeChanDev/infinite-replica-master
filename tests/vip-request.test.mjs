@@ -27,7 +27,31 @@ test("maps a text-to-video request to the VIP contract", () => {
 test("maps model and 4K spelling", () => {
   assert.equal(mapVipModel("seedance-2"), "seedance-2-0");
   assert.equal(mapVipModel("seedance-2-fast"), "seedance-2-0-fast");
+  assert.equal(mapVipModel("seedance-2.5"), "seedance-2-5");
   assert.equal(mapVipResolution("4k"), "4K");
+});
+
+test("Seedance 2.5 accepts its own duration, resolution and reference bounds", () => {
+  const refs = [
+    ...Array.from({ length: 30 }, (_, n) => ({ url: `https://x.test/i${n}`, type: "image", role: "reference_image" })),
+    ...Array.from({ length: 10 }, (_, n) => ({ url: `https://x.test/v${n}`, type: "video", role: "reference_video" })),
+    ...Array.from({ length: 10 }, (_, n) => ({ url: `https://x.test/a${n}`, type: "audio", role: "reference_audio" })),
+  ];
+  const input = { model: "seedance-2.5", prompt: "A scene", duration: 30, resolution: "1080p", refs };
+  assert.equal(buildVipVideoRequest(input).ref.length, 50);
+  assert.equal(buildVipVideoRequest({ ...input, duration: 4, refs: refs.slice(40) }).ref.length, 10);
+  assert.throws(() => buildVipVideoRequest({ ...input, duration: -1 }), /4 to 30/);
+  assert.throws(() => buildVipVideoRequest({ ...input, duration: 31 }), /4 to 30/);
+  assert.throws(() => buildVipVideoRequest({ ...input, resolution: "4k" }), /4K/);
+  assert.throws(() => buildVipVideoRequest({ ...input, refs: [...refs.slice(0, 30), refs[0]] }), /30 image/);
+  assert.throws(() => buildVipVideoRequest({ ...input, refs: [...refs.slice(30, 40), refs[30]] }), /10 video/);
+  assert.throws(() => buildVipVideoRequest({ ...input, refs: [...refs.slice(40), refs[40]] }), /10 audio/);
+  assert.throws(() => buildVipVideoRequest({ ...input, refs: [...refs, refs[0]] }), /30 image/);
+  assert.throws(() => buildVipVideoRequest({ ...input, refs: [{ url: "https://x.test/a", type: "audio", role: "reference_image" }] }), /does not match/);
+  assert.throws(() => buildVipVideoRequest({ ...input, refs: [
+    { url: "https://x.test/a", type: "image", role: "first_frame" },
+    { url: "https://x.test/b", type: "audio", role: "reference_audio" },
+  ] }), /cannot mix/);
 });
 
 test("preserves ordinary reference roles and strict frame roles", () => {
@@ -68,9 +92,11 @@ test("rejects unsupported options and invalid reference combinations", () => {
 test("normalizes VIP task states and requires a completed result URL", () => {
   assert.equal(mapVipTaskStatus("queued"), "pending");
   assert.equal(mapVipTaskStatus("in_progress"), "pending");
+  assert.equal(mapVipTaskStatus("pending"), "pending");
+  assert.equal(mapVipTaskStatus("processing"), "pending");
   assert.equal(mapVipTaskStatus("completed"), "ready");
   assert.equal(mapVipTaskStatus("failed"), "failed");
+  assert.equal(mapVipTaskStatus("cancelled"), "failed");
   assert.equal(extractVipResultUrl({ metadata: { url: "https://media.example.com/result.mp4" } }), "https://media.example.com/result.mp4");
   assert.throws(() => extractVipResultUrl({ metadata: {} }), /metadata\.url/);
 });
-

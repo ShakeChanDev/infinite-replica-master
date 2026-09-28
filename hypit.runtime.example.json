@@ -11,12 +11,15 @@
         "baseUrl": "https://vip.brioi.com",
         "apiKey": { "store": "platform", "key": "vip-brioi.personal" },
         "pollIntervalMs": 5000,
-        "concurrency": 1
+        "concurrency": 1,
+        "personReferencePolicy": "advisory"
       }
     }
   },
   "bindings": {
-    "@hypit/seedance@1#seedance-2-mini": "vip-brioi.video"
+    "@hypit/seedance@1#seedance-2": "vip-brioi.video",
+    "@hypit/seedance@1#seedance-2-fast": "vip-brioi.video",
+    "@hypit/seedance@1#seedance-2-mini": "vip-brioi.video",
+    "@hypit/seedance@1#seedance-2.5": "vip-brioi.video"
   }
 }
-

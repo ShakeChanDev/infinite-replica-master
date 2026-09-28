@@ -1,0 +1,4 @@
+interface:
+  display_name: "hypitPro"
+  short_description: "Create Hypit videos with VIP Seedance routing"
+  default_prompt: "Use $hypit-pro to make or revise the video from my brief, using VIP for supported Seedance 2 and 2.5 video requests."
